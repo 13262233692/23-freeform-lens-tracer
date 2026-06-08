@@ -21,6 +21,8 @@ struct LightSourceConfig
     int maxBounces = 32;
     float energyThreshold = 0.01f;
     float selfIntersectEpsilon = 0.01f;
+    float abbeNumber = 57.4f;
+    bool spectralMode = true;
 };
 
 class RayTracerEngine : public QObject

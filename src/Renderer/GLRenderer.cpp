@@ -83,6 +83,7 @@ bool GLRenderer::initialize()
 
     m_rayVAO.create();
     m_rayVBO.create();
+    m_rayCBO.create();
 
     m_lightVAO.create();
     m_lightVBO.create();
@@ -129,20 +130,38 @@ void GLRenderer::uploadRayPaths(const std::vector<RayPath>& paths)
     if (!m_initialized) return;
 
     std::vector<float> allRayVerts;
+    std::vector<float> allRayColors;
     allRayVerts.reserve(paths.size() * 20);
+    allRayColors.reserve(paths.size() * 20);
 
     for (const auto& path : paths) {
-        for (float p : path.points) {
-            allRayVerts.push_back(p);
+        int vertCount = static_cast<int>(path.points.size()) / 3;
+        for (int v = 0; v < vertCount; ++v) {
+            allRayVerts.push_back(path.points[v * 3]);
+            allRayVerts.push_back(path.points[v * 3 + 1]);
+            allRayVerts.push_back(path.points[v * 3 + 2]);
+
+            float intensity = (v < static_cast<int>(path.intensities.size()))
+                                  ? path.intensities[v] : 1.0f;
+            allRayColors.push_back(path.color.x() * intensity);
+            allRayColors.push_back(path.color.y() * intensity);
+            allRayColors.push_back(path.color.z() * intensity);
         }
     }
 
     m_rayVAO.bind();
+
     m_rayVBO.bind();
     m_rayVBO.allocate(allRayVerts.data(), allRayVerts.size() * sizeof(float));
 
     m_rayProgram->enableAttributeArray(0);
     m_rayProgram->setAttributeBuffer(0, GL_FLOAT, 0, 3);
+
+    m_rayCBO.bind();
+    m_rayCBO.allocate(allRayColors.data(), allRayColors.size() * sizeof(float));
+
+    m_rayProgram->enableAttributeArray(1);
+    m_rayProgram->setAttributeBuffer(1, GL_FLOAT, 0, 3);
 
     m_rayVertexCount = allRayVerts.size() / 3;
 
@@ -227,7 +246,6 @@ void GLRenderer::renderRays(const QMatrix4x4& view, const QMatrix4x4& projection
     m_rayProgram->bind();
     m_rayProgram->setUniformValue("uView", view);
     m_rayProgram->setUniformValue("uProjection", projection);
-    m_rayProgram->setUniformValue("uRayColor", m_rayColor);
     m_rayProgram->setUniformValue("uRayAlpha", 0.85f);
 
     glLineWidth(1.5f);
@@ -270,6 +288,7 @@ void GLRenderer::cleanup()
     m_surfaceIBO.destroy();
     m_rayVAO.destroy();
     m_rayVBO.destroy();
+    m_rayCBO.destroy();
     m_lightVAO.destroy();
     m_lightVBO.destroy();
 

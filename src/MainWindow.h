@@ -38,6 +38,8 @@ private slots:
     void onToggleLightSource(bool checked);
     void onLightHalfAngleChanged(double value);
     void onFreeformAmplitudeChanged(double value);
+    void onAbbeNumberChanged(double value);
+    void onToggleSpectralMode(bool checked);
 
 private:
     void createActions();
@@ -61,6 +63,8 @@ private:
     QDoubleSpinBox* m_lightPosYSpin = nullptr;
     QDoubleSpinBox* m_lightPosZSpin = nullptr;
     QDoubleSpinBox* m_refractiveIndexSpin = nullptr;
+    QDoubleSpinBox* m_abbeNumberSpin = nullptr;
+    QCheckBox* m_spectralModeCheck = nullptr;
     QDoubleSpinBox* m_lightHalfAngleSpin = nullptr;
     QSpinBox* m_rayCountSpin = nullptr;
     QSpinBox* m_maxBouncesSpin = nullptr;

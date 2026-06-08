@@ -132,7 +132,9 @@ std::vector<RayPath> RayTracerEngine::traceRaysThread(int startIdx, int count)
     localPaths.reserve(count);
 
     float nEnv = m_lightConfig.nEnvironment;
-    float nMed = m_lightConfig.nMedium;
+    float nMed_d = m_lightConfig.nMedium;
+    float abbeV = m_lightConfig.abbeNumber;
+    bool spectral = m_lightConfig.spectralMode;
     int maxBounces = m_lightConfig.maxBounces;
     float energyThreshold = m_lightConfig.energyThreshold;
     float epsilon = m_lightConfig.selfIntersectEpsilon;
@@ -141,6 +143,13 @@ std::vector<RayPath> RayTracerEngine::traceRaysThread(int startIdx, int count)
         if (m_cancelFlag.load()) break;
 
         int rayIdx = startIdx + i;
+
+        float wavelength;
+        if (spectral) {
+            wavelength = OpticalMath::sampleSpectralWavelength();
+        } else {
+            wavelength = OpticalMath::WAVELENGTH_d;
+        }
 
         QVector3D localDir = OpticalMath::randomDirectionCone(m_lightConfig.halfAngle);
         QVector3D up = std::abs(m_lightConfig.direction.z()) < 0.999f
@@ -152,10 +161,14 @@ std::vector<RayPath> RayTracerEngine::traceRaysThread(int startIdx, int count)
                               bitangent * localDir.y() +
                               m_lightConfig.direction * localDir.z()).normalized();
 
-        OpticalMath::Ray ray(m_lightConfig.position, worldDir);
+        OpticalMath::Ray ray(m_lightConfig.position, worldDir, wavelength);
 
         RayPath path;
-        path.color = QVector3D(1.0f, 0.85f, 0.2f);
+        if (spectral) {
+            path.color = OpticalMath::wavelengthToRGB(wavelength);
+        } else {
+            path.color = QVector3D(1.0f, 0.85f, 0.2f);
+        }
 
         bool inside = false;
         float energy = 1.0f;
@@ -186,6 +199,13 @@ std::vector<RayPath> RayTracerEngine::traceRaysThread(int startIdx, int count)
                 effectiveNormal = surfaceNormal;
             }
 
+            float nMed;
+            if (spectral) {
+                nMed = OpticalMath::cauchyRefractiveIndex(nMed_d, abbeV, wavelength);
+            } else {
+                nMed = nMed_d;
+            }
+
             float n1 = inside ? nMed : nEnv;
             float n2 = inside ? nEnv : nMed;
 
@@ -193,24 +213,24 @@ std::vector<RayPath> RayTracerEngine::traceRaysThread(int startIdx, int count)
 
             if (isTIR) {
                 QVector3D reflectedDir = OpticalMath::reflect(ray.direction, effectiveNormal);
-                ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir);
+                ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir, wavelength);
                 energy *= 0.98f;
             } else {
                 float fresnelR = OpticalMath::fresnelReflectance(ray.direction, effectiveNormal, n1, n2);
 
                 if (OpticalMath::randomFloat() < fresnelR) {
                     QVector3D reflectedDir = OpticalMath::reflect(ray.direction, effectiveNormal);
-                    ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir);
+                    ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir, wavelength);
                     energy *= (1.0f - fresnelR);
                 } else {
                     QVector3D refractedDir = OpticalMath::refract(ray.direction, effectiveNormal, n1, n2);
                     if (refractedDir.lengthSquared() < 1e-10f) {
                         QVector3D reflectedDir = OpticalMath::reflect(ray.direction, effectiveNormal);
-                        ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir);
+                        ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir, wavelength);
                         energy *= 0.98f;
                     } else {
                         inside = !inside;
-                        ray = OpticalMath::Ray(hit.point - effectiveNormal * epsilon, refractedDir);
+                        ray = OpticalMath::Ray(hit.point - effectiveNormal * epsilon, refractedDir, wavelength);
                         energy *= (1.0f - fresnelR);
                     }
                 }

@@ -1,11 +1,12 @@
 #version 450 core
 
-uniform vec3 uRayColor;
+in vec3 vColor;
+
 uniform float uRayAlpha;
 
 out vec4 FragColor;
 
 void main()
 {
-    FragColor = vec4(uRayColor, uRayAlpha);
+    FragColor = vec4(vColor, uRayAlpha);
 }

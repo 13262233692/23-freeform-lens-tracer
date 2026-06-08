@@ -69,6 +69,7 @@ private:
 
     QOpenGLVertexArrayObject m_rayVAO;
     QOpenGLBuffer m_rayVBO{QOpenGLBuffer::VertexBuffer};
+    QOpenGLBuffer m_rayCBO{QOpenGLBuffer::VertexBuffer};
     int m_rayVertexCount = 0;
 
     QOpenGLVertexArrayObject m_lightVAO;

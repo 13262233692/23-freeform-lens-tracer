@@ -202,9 +202,27 @@ QDockWidget* MainWindow::createLightSourcePanel()
     m_refractiveIndexSpin->setValue(1.4925);
     m_refractiveIndexSpin->setSingleStep(0.01);
     m_refractiveIndexSpin->setDecimals(4);
+    m_refractiveIndexSpin->setToolTip(tr("Refractive index n_d at 587.56nm (d-line)"));
     connect(m_refractiveIndexSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &MainWindow::onRefractiveIndexChanged);
-    layout->addRow(tr("Refractive Index:"), m_refractiveIndexSpin);
+    layout->addRow(tr("n_d (587nm):"), m_refractiveIndexSpin);
+
+    m_abbeNumberSpin = new QDoubleSpinBox();
+    m_abbeNumberSpin->setRange(10.0, 100.0);
+    m_abbeNumberSpin->setValue(57.4);
+    m_abbeNumberSpin->setSingleStep(0.5);
+    m_abbeNumberSpin->setDecimals(1);
+    m_abbeNumberSpin->setToolTip(tr("Abbe number V_d = (n_d - 1)/(n_F - n_C)\nPMMA: 57.4 | BK7: 64.2 | SF11: 25.8"));
+    connect(m_abbeNumberSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::onAbbeNumberChanged);
+    layout->addRow(tr("Abbe Number V_d:"), m_abbeNumberSpin);
+
+    m_spectralModeCheck = new QCheckBox(tr("Spectral (Chromatic)"));
+    m_spectralModeCheck->setChecked(true);
+    m_spectralModeCheck->setToolTip(tr("Enable wavelength-dependent refractive index via Cauchy dispersion.\nProduces chromatic aberration (rainbow fringing)."));
+    connect(m_spectralModeCheck, &QCheckBox::toggled,
+            this, &MainWindow::onToggleSpectralMode);
+    layout->addRow(tr("Mode:"), m_spectralModeCheck);
 
     m_lightHalfAngleSpin = new QDoubleSpinBox();
     m_lightHalfAngleSpin->setRange(5.0, 90.0);
@@ -315,6 +333,8 @@ void MainWindow::onRunTrace()
     config.rayCount = m_rayCountSpin->value();
     config.maxBounces = m_maxBouncesSpin->value();
     config.halfAngle = m_lightHalfAngleSpin->value() * 3.14159265f / 180.0f;
+    config.abbeNumber = m_abbeNumberSpin->value();
+    config.spectralMode = m_spectralModeCheck->isChecked();
 
     m_canvas->rayTracer()->setLightSource(config);
     m_canvas->renderer()->uploadLightPosition(config.position);
@@ -395,4 +415,13 @@ void MainWindow::onLightHalfAngleChanged(double)
 void MainWindow::onFreeformAmplitudeChanged(double)
 {
     rebuildSurface();
+}
+
+void MainWindow::onAbbeNumberChanged(double)
+{
+}
+
+void MainWindow::onToggleSpectralMode(bool checked)
+{
+    m_abbeNumberSpin->setEnabled(checked);
 }
