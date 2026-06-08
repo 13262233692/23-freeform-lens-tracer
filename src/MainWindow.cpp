@@ -224,8 +224,8 @@ QDockWidget* MainWindow::createLightSourcePanel()
     layout->addRow(tr("Ray Count:"), m_rayCountSpin);
 
     m_maxBouncesSpin = new QSpinBox();
-    m_maxBouncesSpin->setRange(1, 20);
-    m_maxBouncesSpin->setValue(5);
+    m_maxBouncesSpin->setRange(1, 128);
+    m_maxBouncesSpin->setValue(32);
     layout->addRow(tr("Max Bounces:"), m_maxBouncesSpin);
 
     dock->setWidget(content);

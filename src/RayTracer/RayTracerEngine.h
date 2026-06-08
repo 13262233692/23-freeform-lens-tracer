@@ -18,7 +18,9 @@ struct LightSourceConfig
     int rayCount = 10000;
     float nMedium = 1.4925f;
     float nEnvironment = 1.0f;
-    int maxBounces = 5;
+    int maxBounces = 32;
+    float energyThreshold = 0.01f;
+    float selfIntersectEpsilon = 0.01f;
 };
 
 class RayTracerEngine : public QObject

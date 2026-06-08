@@ -12,12 +12,16 @@
 struct RayPath
 {
     std::vector<float> points;
+    std::vector<float> intensities;
     QVector3D color;
+    float maxIntensity = 0.0f;
     int segmentCount() const { return static_cast<int>(points.size()) / 3 - 1; }
-    void addPoint(const QVector3D& p) {
+    void addPoint(const QVector3D& p, float intensity = 1.0f) {
         points.push_back(p.x());
         points.push_back(p.y());
         points.push_back(p.z());
+        intensities.push_back(intensity);
+        if (intensity > maxIntensity) maxIntensity = intensity;
     }
 };
 

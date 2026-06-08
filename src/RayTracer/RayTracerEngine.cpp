@@ -131,6 +131,12 @@ std::vector<RayPath> RayTracerEngine::traceRaysThread(int startIdx, int count)
     std::vector<RayPath> localPaths;
     localPaths.reserve(count);
 
+    float nEnv = m_lightConfig.nEnvironment;
+    float nMed = m_lightConfig.nMedium;
+    int maxBounces = m_lightConfig.maxBounces;
+    float energyThreshold = m_lightConfig.energyThreshold;
+    float epsilon = m_lightConfig.selfIntersectEpsilon;
+
     for (int i = 0; i < count; ++i) {
         if (m_cancelFlag.load()) break;
 
@@ -150,43 +156,79 @@ std::vector<RayPath> RayTracerEngine::traceRaysThread(int startIdx, int count)
 
         RayPath path;
         path.color = QVector3D(1.0f, 0.85f, 0.2f);
-        path.addPoint(ray.origin);
 
-        float n1 = m_lightConfig.nEnvironment;
-        float n2 = m_lightConfig.nMedium;
         bool inside = false;
+        float energy = 1.0f;
+        QVector3D lastHitPoint = ray.origin;
 
-        for (int bounce = 0; bounce <= m_lightConfig.maxBounces; ++bounce) {
+        path.addPoint(ray.origin, energy);
+
+        int bounce = 0;
+        while (bounce < maxBounces && energy > energyThreshold) {
             OpticalMath::HitRecord hit = intersectRaySurface(ray);
 
             if (!hit.hit) {
-                path.addPoint(ray.pointAt(20.0f));
+                path.addPoint(ray.pointAt(20.0f), energy);
                 break;
             }
 
-            path.addPoint(hit.point);
+            path.addPoint(hit.point, energy);
 
-            QVector3D normal = hit.normal;
-            float cosI = QVector3D::dotProduct(ray.direction, normal);
+            QVector3D surfaceNormal = hit.normal;
+            float cosI = QVector3D::dotProduct(ray.direction, surfaceNormal);
 
-            if (cosI > 0) {
-                normal = -normal;
-                std::swap(n1, n2);
-                inside = !inside;
-            }
+            bool hittingFromInside = (cosI > 0.0f);
 
-            float fresnelR = OpticalMath::fresnelReflectance(ray.direction, normal, n1, n2);
-
-            if (OpticalMath::totalInternalReflection(ray.direction, normal, n1, n2)) {
-                ray = OpticalMath::Ray(hit.point + normal * 0.001f,
-                                        OpticalMath::reflect(ray.direction, normal));
-            } else if (OpticalMath::randomFloat() < fresnelR) {
-                ray = OpticalMath::Ray(hit.point + normal * 0.001f,
-                                        OpticalMath::reflect(ray.direction, normal));
+            QVector3D effectiveNormal;
+            if (hittingFromInside) {
+                effectiveNormal = -surfaceNormal;
             } else {
-                QVector3D refracted = OpticalMath::refract(ray.direction, normal, n1, n2);
-                ray = OpticalMath::Ray(hit.point - normal * 0.001f, refracted);
+                effectiveNormal = surfaceNormal;
             }
+
+            float n1 = inside ? nMed : nEnv;
+            float n2 = inside ? nEnv : nMed;
+
+            bool isTIR = OpticalMath::totalInternalReflection(ray.direction, effectiveNormal, n1, n2);
+
+            if (isTIR) {
+                QVector3D reflectedDir = OpticalMath::reflect(ray.direction, effectiveNormal);
+                ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir);
+                energy *= 0.98f;
+            } else {
+                float fresnelR = OpticalMath::fresnelReflectance(ray.direction, effectiveNormal, n1, n2);
+
+                if (OpticalMath::randomFloat() < fresnelR) {
+                    QVector3D reflectedDir = OpticalMath::reflect(ray.direction, effectiveNormal);
+                    ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir);
+                    energy *= (1.0f - fresnelR);
+                } else {
+                    QVector3D refractedDir = OpticalMath::refract(ray.direction, effectiveNormal, n1, n2);
+                    if (refractedDir.lengthSquared() < 1e-10f) {
+                        QVector3D reflectedDir = OpticalMath::reflect(ray.direction, effectiveNormal);
+                        ray = OpticalMath::Ray(hit.point + effectiveNormal * epsilon, reflectedDir);
+                        energy *= 0.98f;
+                    } else {
+                        inside = !inside;
+                        ray = OpticalMath::Ray(hit.point - effectiveNormal * epsilon, refractedDir);
+                        energy *= (1.0f - fresnelR);
+                    }
+                }
+            }
+
+            float distToLastHit = (hit.point - lastHitPoint).length();
+            if (distToLastHit < epsilon * 0.5f && bounce > 0) {
+                QVector3D escaped = hit.point + ray.direction * epsilon * 10.0f;
+                path.addPoint(escaped, 0.0f);
+                break;
+            }
+            lastHitPoint = hit.point;
+
+            bounce++;
+        }
+
+        if (bounce >= maxBounces && energy > energyThreshold) {
+            path.addPoint(ray.pointAt(5.0f), energy * 0.1f);
         }
 
         localPaths.push_back(std::move(path));
